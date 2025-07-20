@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 // Main App Component
 const App = () => {
@@ -7,16 +7,32 @@ const App = () => {
     // 0 for neutral, 1 for positive, -1 for negative
     const [lastOutcome, setLastOutcome] = useState(0); 
     
-    // State for displaying the event result
+    // State for displaying the event result (initially showing only the first part)
     const [eventResult, setEventResult] = useState('กดปุ่มเพื่อสุ่มเหตุการณ์!');
     
+    // State to store the full text of the selected event, including the explanation
+    const [currentFullEventText, setCurrentFullEventText] = useState('');
+
     // State to control the visibility of the "change" numbers (e.g., (+5))
     const [areChangeNumbersRevealed, setAreChangeNumbersRevealed] = useState(false);
 
     // State to manage the phase of the main button
     // 'initial_roll': Initial state or ready to roll a new event
     // 'reveal_numbers': Event rolled, numbers are calculated but hidden, button can reveal them
+    // 'end_game': Game is ready to be ended and summary shown
     const [buttonPhase, setButtonPhase] = useState('initial_roll'); 
+
+    // New state for the current round number, starting at 0
+    const [roundNumber, setRoundNumber] = useState(0);
+
+    // New state to control visibility of the game over summary
+    const [isGameOver, setIsGameOver] = useState(false);
+
+    // State for controlling event text animation
+    const [isEventTextAnimating, setIsEventTextAnimating] = useState(false);
+
+    // Ref for setTimeout cleanup
+    const animationTimeoutRef = useRef(null);
     
     // Define categories and their items for UI display and data mapping
     const assetItems = ["ทองคำ", "ที่ดิน", "คริปโต"];
@@ -27,7 +43,7 @@ const App = () => {
 
     // State to hold all generated numbers and cumulative totals for each item
     // For assets/stocks: { displayedTotal: number, calculatedChange: number, nextTotal: number }
-    // For businesses: { calculatedChange: number }
+    // For businesses: { calculatedChange: number, cumulativeChange: number }
     const [itemData, setItemData] = useState({});
 
     // Define 50 possible events and their specific impacts extracted from the PDF
@@ -131,7 +147,7 @@ const App = () => {
         },
         {
             text: 'ราคาวัตถุดิบทางการเกษตรสูงขึ้น: ส่งผลกระทบต่อต้นทุนการผลิตอาหาร', sentiment: -1,
-            impacts: { "ทองคำ": 1, "ที่ดิน": 1, "คริปโต": 1, "ร้านอาหาร": -1, "ร้านธัญพืช": 1, "บริการส่งพัสดุ": 1, "Stock A": 1, "Stock B": -1, "Stock C": 1, "Stock D": 1, "Stock E": 1 }
+            impacts: { "ทองคำ": 1, "ที่ดิน": 1, "คริปโต": 1, "ร้านอาหาร": -1, "ร้านธัญพืช": -1, "บริการส่งพัสดุ": 1, "Stock A": -1, "Stock B": 1, "Stock C": 1, "Stock D": 1, "Stock E": 1 }
         },
         {
             text: 'กฎหมายสนับสนุนการพัฒนาอสังหาฯ: ส่งผลดีต่อการก่อสร้างและราคาที่ดิน', sentiment: 1,
@@ -175,7 +191,7 @@ const App = () => {
         },
         {
             text: 'ความต้องการที่พักอาศัยลดลง: ภาคอสังหาฯ ชะลอตัว', sentiment: -1,
-            impacts: { "ทองคำ": 1, "ที่ดิน": -1, "คริปโต": -1, "ร้านอาหาร": -1, "ร้านธัญพืช": 1, "บริการส่งพัสดุ": 1, "Stock A": 1, "Stock B": 1, "Stock C": -1, "Stock D": -1, "Stock E": -1 }
+            impacts: { "ทองคำ": 1, "ที่ดิน": -1, "คริปโต": -1, "ร้านอาหาร": -1, "ร้านธัญพืช": 1, "บริการส่งพัสดุ": 1, "Stock A": 1, "Stock B": 1, "Stock C": -1, "Stock D": -1, "Stock E": 1 }
         },
         {
             text: 'นโยบายภาษีใหม่: ส่งผลกระทบต่อภาคการเงินและอสังหาฯ', sentiment: -1,
@@ -215,7 +231,7 @@ const App = () => {
         },
         {
             text: 'ตลาดแรงงานขาดแคลน: ส่งผลกระทบต่อการผลิตในภาคอุตสาหกรรม', sentiment: -1,
-            impacts: { "ทองคำ": 1, "ที่ดิน": 1, "คริปโต": 1, "ร้านอาหาร": 1, "ร้านธัญพืช": 1, "บริการส่งพัสดุ": 1, "Stock A": 1, "Stock B": 1, "Stock C": 1, "Stock D": 1, "Stock E": -1 }
+            impacts: { "ทองคำ": 1, "ที่ดิน": 1, "คริปโต": 1, "ร้านอาหาร": -1, "ร้านธัญพืช": -1, "บริการส่งพัสดุ": -1, "Stock A": -1, "Stock B": -1, "Stock C": -1, "Stock D": -1, "Stock E": -1 }
         },
         {
             text: 'การพัฒนาเมืองใหม่: ส่งผลดีต่อราคาที่ดินและการก่อสร้าง', sentiment: 1,
@@ -237,9 +253,9 @@ const App = () => {
 
     // Initial values for assets and stocks (can be any value)
     const initialItemValues = {
-        "ทองคำ": 15000,
-        "ที่ดิน": 15000,
-        "คริปโต": 5000,
+        "ทองคำ": 15, 
+        "ที่ดิน": 15, 
+        "คริปโต": 5,  
         "ร้านธัญพืช": 0, 
         "ร้านอาหาร": 0,
         "บริการส่งพัสดุ": 0,
@@ -253,108 +269,180 @@ const App = () => {
     // Initialize itemData state when the component mounts
     useEffect(() => {
         const initialData = {};
-        // Combine all item lists and set their initial numbers
-        allItems.forEach(item => { // Use allItems for initialization
+        allItems.forEach(item => { 
             if (assetItems.includes(item) || stockItems.includes(item)) {
-                // For assets and stocks, initialize with displayedTotal, calculatedChange, and nextTotal
                 const initialVal = initialItemValues[item] || 0;
                 initialData[item] = { 
                     displayedTotal: initialVal, 
                     calculatedChange: 0, 
                     nextTotal: initialVal 
                 };
-            } else {
-                // For business items, initialize with only calculatedChange
-                initialData[item] = { calculatedChange: 0 };
+            } else { // Business items
+                initialData[item] = { calculatedChange: 0, cumulativeChange: 0 }; // Initialize cumulativeChange for businesses
             }
         });
         setItemData(initialData);
-    }, []); // Empty dependency array means this effect runs only once after the initial render
 
-    // Helper function to generate a change value based on the impact type (+, -, 0)
-    // The change will be a multiple of 100, between -500 and 500.
-    const generateChangeValue = (impactType) => { 
-        if (impactType === 1) { // '+' in PDF: generate a positive change (100 to 500)
-            const possiblePositiveChanges = [100, 200, 300, 400, 500];
-            return possiblePositiveChanges[Math.floor(Math.random() * possiblePositiveChanges.length)];
-        } else if (impactType === -1) { // '-' in PDF: generate a negative change (-100 to -500)
-            const possibleNegativeChanges = [-100, -200, -300, -400, -500];
-            return possibleNegativeChanges[Math.floor(Math.random() * possibleNegativeChanges.length)];
-        } else { // ' ' (blank) or '0' in PDF: no change
-            return 0;
+        // Cleanup function for useEffect
+        return () => {
+            if (animationTimeoutRef.current) {
+                clearTimeout(animationTimeoutRef.current);
+            }
+        };
+    }, []); 
+
+    // Helper function to generate a change value based on the item and impact type
+    // Added currentDisplayedTotal and initialValue for biasing asset changes
+    const generateChangeValue = (item, impactType, currentDisplayedTotal, initialValue) => { 
+        let possiblePositiveChanges;
+        let possibleNegativeChanges;
+
+        if (item === "ทองคำ") {
+            possiblePositiveChanges = [5, 6, 7, 8, 9, 10];
+            possibleNegativeChanges = [-10, -9, -8, -7, -6, -5];
+        } else if (item === "ที่ดิน") {
+            possiblePositiveChanges = [0, 1, 2, 3, 4, 5]; 
+            possibleNegativeChanges = [-5, -4, -3, -2, -1, 0]; 
+        } else if (item === "คริปโต") {
+            possiblePositiveChanges = [10, 11, 12, 13, 14, 15];
+            possibleNegativeChanges = [-15, -14, -13, -12, -11, -10];
+        } else if (businessItems.includes(item)) { 
+            possiblePositiveChanges = [0, 1, 2, 3, 4, 5];
+            possibleNegativeChanges = [-5, -4, -3, -2, -1, 0];
         }
+        else { // Default for other items (stocks)
+            possiblePositiveChanges = [100, 200, 300, 400, 500];
+            possibleNegativeChanges = [-100, -200, -300, -400, -500];
+        }
+
+        let change = 0;
+        if (impactType === 1) { // Positive impact
+            if (assetItems.includes(item) && currentDisplayedTotal < initialValue) {
+                // If asset is below initial value and positive impact, bias towards higher positive changes
+                // Select from the latter half of possiblePositiveChanges
+                change = possiblePositiveChanges[Math.floor(Math.random() * (possiblePositiveChanges.length / 2)) + Math.floor(possiblePositiveChanges.length / 2)];
+            } else {
+                change = possiblePositiveChanges[Math.floor(Math.random() * possiblePositiveChanges.length)];
+            }
+        } else if (impactType === -1) { // Negative impact
+            if (assetItems.includes(item) && currentDisplayedTotal < initialValue) {
+                // If asset is below initial value and negative impact, bias towards smaller negative changes (closer to zero)
+                // Select from the first half of possibleNegativeChanges
+                change = possibleNegativeChanges[Math.floor(Math.random() * (possibleNegativeChanges.length / 2))]; 
+            } else {
+                change = possibleNegativeChanges[Math.floor(Math.random() * possibleNegativeChanges.length)];
+            }
+        }
+        return change;
     };
 
     // Function to handle the main button click logic
     const handleMainButtonClick = () => {
         if (buttonPhase === 'initial_roll') {
-            // Logic for "สุ่มเหตุการณ์!"
-            let selectedEvent;
-            let possibleEvents = [];
-
-            // If no events are defined, set a default message and do not proceed with impact calculation
-            if (events.length === 0) {
-                setEventResult('ไม่มีเหตุการณ์ให้สุ่ม! โปรดเพิ่มเหตุการณ์ในโค้ด.');
-                // Reset button phase to initial_roll so user can try again if events are added
-                setButtonPhase('initial_roll');
-                return; // Exit the function early
+            // Clear any existing animation timeout
+            if (animationTimeoutRef.current) {
+                clearTimeout(animationTimeoutRef.current);
             }
 
-            // Bias event selection based on lastOutcome (overall sentiment of previous event)
-            if (lastOutcome < 0) {
-                possibleEvents = events.filter(e => e.sentiment >= 0);
-                if (possibleEvents.length === 0) possibleEvents = events;
-            } else if (lastOutcome > 0) {
-                possibleEvents = events.filter(e => e.sentiment <= 0);
-                if (possibleEvents.length === 0) possibleEvents = events;
-            } else {
-                possibleEvents = events;
-            }
-            selectedEvent = possibleEvents[Math.floor(Math.random() * possibleEvents.length)];
-            setEventResult(selectedEvent.text);
+            // Start animation
+            setIsEventTextAnimating(true);
+            setEventResult('กำลังสุ่มเหตุการณ์...'); // Show temporary text during animation
 
-            // Update lastOutcome for the *next* roll based on the current event's overall sentiment
-            setLastOutcome(selectedEvent.sentiment); 
+            // Delay the actual event logic to allow animation to play
+            animationTimeoutRef.current = setTimeout(() => {
+                let selectedEvent;
+                let possibleEvents = [];
 
-            const newItemData = { ...itemData }; // Create a mutable copy of the current state
-            
-            // Calculate changes and next totals for ALL items based on the selected event's specific impacts
-            allItems.forEach(item => { 
-                const impactType = selectedEvent.impacts[item] || 0; // Get specific impact for this item, default to 0
-                const currentChange = generateChangeValue(impactType); // Use the new function to get change based on impact
-
-                if (assetItems.includes(item) || stockItems.includes(item)) {
-                    const previousDisplayedTotal = newItemData[item]?.displayedTotal || 0;
-                    const newNextTotal = previousDisplayedTotal + currentChange;
-                    
-                    newItemData[item] = { 
-                        displayedTotal: previousDisplayedTotal, // Keep previous displayed total for now
-                        calculatedChange: currentChange, 
-                        nextTotal: newNextTotal 
-                    };
-                } else { // Business items
-                    newItemData[item] = { calculatedChange: currentChange };
+                if (events.length === 0) {
+                    setEventResult('ไม่มีเหตุการณ์ให้สุ่ม! โปรดเพิ่มเหตุการณ์ในโค้ด.');
+                    setButtonPhase('initial_roll');
+                    setIsEventTextAnimating(false); // Stop animation
+                    return;
                 }
-            });
-            setItemData(newItemData); // Update the state with the new calculated data
 
-            setAreChangeNumbersRevealed(false); // Hide change numbers initially
-            setButtonPhase('reveal_numbers'); // Change button to "แสดงตัวเลข"
+                // Bias event selection based on lastOutcome (overall sentiment of previous event)
+                if (lastOutcome < 0) {
+                    possibleEvents = events.filter(e => e.sentiment >= 0);
+                    if (possibleEvents.length === 0) possibleEvents = events;
+                } else if (lastOutcome > 0) {
+                    possibleEvents = events.filter(e => e.sentiment <= 0);
+                    if (possibleEvents.length === 0) possibleEvents = events;
+                } else {
+                    possibleEvents = events;
+                }
+                selectedEvent = possibleEvents[Math.floor(Math.random() * possibleEvents.length)];
 
+                // Store the full event text
+                setCurrentFullEventText(selectedEvent.text);
+                const colonIndex = selectedEvent.text.indexOf(':');
+                let initialEventDisplay = selectedEvent.text;
+                if (colonIndex !== -1) {
+                    initialEventDisplay = selectedEvent.text.substring(0, colonIndex).trim();
+                }
+                setEventResult(initialEventDisplay); // Set the actual partial text
+
+                // Increment round number only when a new event is rolled
+                setRoundNumber(prevRound => prevRound + 1);
+
+                // Update lastOutcome for the *next* roll based on the current event's overall sentiment
+                setLastOutcome(selectedEvent.sentiment); 
+
+                const newItemData = { ...itemData }; 
+                
+                // Calculate changes and next totals for ALL items based on the selected event's specific impacts
+                allItems.forEach(item => { 
+                    const impactType = selectedEvent.impacts[item] || 0; 
+                    
+                    // Pass currentDisplayedTotal and initialValue for asset items to generateChangeValue
+                    const currentDisplayedTotalForBias = newItemData[item]?.displayedTotal || initialItemValues[item];
+                    const initialValueForBias = initialItemValues[item];
+                    const currentChange = generateChangeValue(item, impactType, currentDisplayedTotalForBias, initialValueForBias); 
+
+                    if (assetItems.includes(item) || stockItems.includes(item)) {
+                        const previousDisplayedTotal = newItemData[item]?.displayedTotal || 0;
+                        const newNextTotal = previousDisplayedTotal + currentChange;
+                        
+                        newItemData[item] = { 
+                            displayedTotal: previousDisplayedTotal, 
+                            calculatedChange: currentChange, 
+                            nextTotal: newNextTotal 
+                        };
+                    } else { // Business items
+                        newItemData[item] = { 
+                            calculatedChange: currentChange,
+                            cumulativeChange: (newItemData[item]?.cumulativeChange || 0) + currentChange // Accumulate changes
+                        };
+                    }
+                });
+                setItemData(newItemData); 
+
+                setAreChangeNumbersRevealed(false); // Hide change numbers initially
+                setButtonPhase('reveal_numbers'); // Change button to "แสดงตัวเลข"
+                setIsEventTextAnimating(false); // Stop animation after content is set
+            }, 500); // Animation duration
         } else if (buttonPhase === 'reveal_numbers') {
             // Logic for "แสดงตัวเลข"
-            const updatedItemData = { ...itemData }; // Create a mutable copy
+            const updatedItemData = { ...itemData }; 
             // Update displayedTotal for assets/stocks to their nextTotal
             [...assetItems, ...stockItems].forEach(item => {
                 if (updatedItemData[item]) {
                     updatedItemData[item].displayedTotal = updatedItemData[item].nextTotal;
                 }
             });
-            setItemData(updatedItemData); // Update the state with new displayed totals
+            setItemData(updatedItemData); 
 
             setAreChangeNumbersRevealed(true); // Show change numbers
-            setEventResult('กดปุ่มเพื่อสุ่มเหตุการณ์!'); // Reset event text for the next roll
-            setButtonPhase('initial_roll'); // Change button back to "สุ่มเหตุการณ์!"
+            setEventResult(currentFullEventText); // Display the full event text including explanation
+
+            // Check if it's the 15th round to show the "End Game" button
+            if (roundNumber === 15) {
+                setButtonPhase('end_game'); 
+            } else {
+                setButtonPhase('initial_roll'); 
+            }
+        } else if (buttonPhase === 'end_game') {
+            // Logic for "จบเกม"
+            setIsGameOver(true);
         }
     };
 
@@ -362,8 +450,10 @@ const App = () => {
     const getButtonText = () => {
         if (buttonPhase === 'initial_roll') {
             return 'สุ่มเหตุการณ์!';
-        } else { // buttonPhase === 'reveal_numbers'
+        } else if (buttonPhase === 'reveal_numbers') {
             return 'แสดงตัวเลข';
+        } else if (buttonPhase === 'end_game') {
+            return 'จบเกม';
         }
     };
 
@@ -371,8 +461,10 @@ const App = () => {
     const getButtonColor = () => {
         if (buttonPhase === 'initial_roll') {
             return 'linear-gradient(to right, #4CAF50, #2196F3)'; // Green to Blue
-        } else {
+        } else if (buttonPhase === 'reveal_numbers') {
             return 'linear-gradient(to right, #FFA726, #FF7043)'; // Orange to Red
+        } else if (buttonPhase === 'end_game') {
+            return 'linear-gradient(to right, #EF4444, #DC2626)'; // Red gradient for end game
         }
     };
 
@@ -403,20 +495,6 @@ const App = () => {
         boxSizing: 'border-box',
     };
 
-    const titleStyles = {
-        fontSize: '2.25rem', // text-4xl equivalent
-        fontWeight: '800', // font-extrabold equivalent
-        marginBottom: '1.5rem', // mb-6 equivalent
-        color: 'white',
-        textShadow: '2px 2px 4px rgba(0, 0, 0, 0.3)', // drop-shadow-lg equivalent
-    };
-
-    const subtitleStyles = {
-        display: 'block',
-        fontSize: '1.5rem', // text-2xl equivalent
-        marginBottom: '0.25rem', // mb-1 equivalent
-    };
-
     const sectionStyles = {
         marginBottom: '2rem', // mb-8 equivalent
         padding: '1rem', // p-4 equivalent
@@ -430,6 +508,9 @@ const App = () => {
         fontWeight: 'bold',
         color: '#FDE047', // text-yellow-200 equivalent
         marginBottom: '1rem',
+        transition: 'opacity 0.3s ease-in-out, transform 0.3s ease-in-out', // Added transition properties
+        opacity: isEventTextAnimating ? 0.5 : 1, // Fade out slightly during animation
+        transform: isEventTextAnimating ? 'scale(0.95)' : 'scale(1)', // Shrink slightly during animation
     };
 
     const buttonBaseStyles = { // Base styles for the button
@@ -456,11 +537,6 @@ const App = () => {
 
     const buttonActiveStyles = {
         transform: 'scale(0.95)',
-    };
-
-    const outcomeTextStyles = {
-        fontSize: '1.5rem', // text-2xl equivalent
-        fontWeight: 'bold',
     };
 
     // Styles for the three-column layout
@@ -516,97 +592,223 @@ const App = () => {
         color: 'white', // Base color for total
     };
 
-    const itemChangeStyles = (change, isVisible) => ({
+    // Updated itemChangeStyles to return arrow symbols and apply color
+    const itemChangeStyles = (change, isVisible, isStock = false) => {
+        let color = '#FDE047'; // Default neutral color
+        let text = '';
+
+        if (isStock) {
+            if (change > 0) {
+                color = '#A7F3D0'; // Green
+                text = '▲';
+            } else if (change < 0) {
+                color = '#FCA5A5'; // Red
+                text = '▼';
+            }
+        } else {
+            if (change > 0) {
+                color = '#A7F3D0'; // Green
+                text = `(+${change})`;
+            } else if (change < 0) {
+                color = '#FCA5A5'; // Red
+                text = `(${change})`;
+            } else {
+                text = '(0)';
+            }
+        }
+
+        return {
+            fontWeight: 'bold',
+            minWidth: isStock ? '20px' : '55px', // Adjust width for arrow
+            textAlign: 'right',
+            color: color,
+            fontSize: isStock ? '1.5em' : '0.9em', // Larger for arrow
+            visibility: isVisible ? 'visible' : 'hidden',
+            transition: 'visibility 0s, opacity 0.3s ease',
+            opacity: isVisible ? 1 : 0,
+            lineHeight: '1', // Ensure arrow is vertically centered
+        };
+    };
+
+    // Styles for the summary section
+    const summarySectionStyles = {
+        background: 'rgba(255, 255, 255, 0.2)',
+        backdropFilter: 'blur(10px)',
+        padding: '2rem',
+        borderRadius: '1rem',
+        boxShadow: '0 10px 15px rgba(0, 0, 0, 0.1)',
+        maxWidth: '600px',
+        width: '100%',
+        textAlign: 'center',
+        border: '1px solid rgba(255, 255, 255, 0.3)',
+        boxSizing: 'border-box',
+        color: 'white',
+    };
+
+    const summaryTitleStyles = {
+        fontSize: '2rem',
         fontWeight: 'bold',
-        minWidth: '55px', // Fixed width for the change number to prevent shifting
-        textAlign: 'right',
-        color: change > 0 ? '#A7F3D0' : (change < 0 ? '#FCA5A5' : '#FDE047'), // Green, Red, Yellow
-        fontSize: '0.9em', // Slightly smaller for the change
-        visibility: isVisible ? 'visible' : 'hidden', // Control visibility
-        transition: 'visibility 0s, opacity 0.3s ease', // Smooth transition for opacity
-        opacity: isVisible ? 1 : 0,
-    });
+        marginBottom: '1.5rem',
+        color: '#FDE047',
+        textShadow: '2px 2px 4px rgba(0, 0, 0, 0.3)',
+    };
+
+    const summaryItemStyles = {
+        fontSize: '1.25rem',
+        marginBottom: '0.75rem',
+        fontWeight: '600',
+    };
+
+    // Helper to format change with + sign if positive
+    const formatChange = (change) => {
+        if (change > 0) {
+            return `(+${change})`;
+        } else if (change < 0) {
+            return `(${change})`;
+        } else {
+            return '(0)';
+        }
+    };
+
+    const summaryValueStyles = (value, isChange = false) => {
+        let color = 'white';
+        if (isChange) {
+            if (value > 0) {
+                color = '#A7F3D0'; // Green
+            } else if (value < 0) {
+                color = '#FCA5A5'; // Red
+            }
+        } else { // For total values
+            // You can add color logic for total values if needed, e.g., if total > initial
+            // For now, keeping it white as per previous design unless specified
+        }
+        return {
+            color: color,
+            fontWeight: 'bold',
+        };
+    };
+
 
     return (
         <div style={appStyles}>
-            <div style={cardStyles}>
-                <h1 style={titleStyles}>
-                    <span style={subtitleStyles}>แอปสุ่มเหตุการณ์</span>
-                    บอร์ดเกม
-                </h1>
+            {!isGameOver ? ( // Conditionally render game content or summary
+                <div style={cardStyles}>
+                    {/* Round Counter */}
+                    <div style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem', color: '#FDE047', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.5)' }}>
+                        รอบที่: {roundNumber}
+                    </div>
 
-                {/* Combined Event and Last Outcome Display */}
-                <div style={sectionStyles}>
-                    <p style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '0.75rem' }}>สถานการณ์:</p>
-                    <p style={eventResultStyles}>{eventResult}</p>
-                    {/* Removed the last outcome sentiment display as per user's previous request */}
-                </div>
+                    {/* Combined Event and Last Outcome Display */}
+                    <div style={sectionStyles}>
+                        <p style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '0.75rem' }}>สถานการณ์:</p>
+                        <p style={eventResultStyles}>{eventResult}</p>
+                    </div>
 
-                {/* Three-column layout for Assets, Businesses, Stocks */}
-                <div style={columnContainerStyles}>
-                    {/* Assets Column */}
-                    <div style={columnStyles}>
-                        <h3 style={columnTitleStyles}>สินทรัพย์</h3>
-                        {assetItems.map(item => (
-                            <p key={item} style={itemRowStyles}>
-                                <span style={itemNameStyles}>{item}:</span>
-                                <span style={itemValueContainerStyles}>
-                                    {/* Displayed total always visible */}
-                                    <span style={itemTotalStyles}>{itemData[item]?.displayedTotal || 0}</span>
+                    {/* Three-column layout for Assets, Businesses, Stocks */}
+                    <div style={columnContainerStyles}>
+                        {/* Assets Column */}
+                        <div style={columnStyles}>
+                            <h3 style={columnTitleStyles}>สินทรัพย์</h3>
+                            {assetItems.map(item => (
+                                <p key={item} style={itemRowStyles}>
+                                    <span style={itemNameStyles}>{item}:</span>
+                                    <span style={itemValueContainerStyles}>
+                                        {/* Displayed total always visible */}
+                                        <span style={itemTotalStyles}>{itemData[item]?.displayedTotal || 0}</span>
+                                        {/* Change number always rendered, but visibility controlled */}
+                                        <span style={itemChangeStyles(itemData[item]?.calculatedChange || 0, areChangeNumbersRevealed)}>
+                                            ({(itemData[item]?.calculatedChange || 0) > 0 ? '+' : ''}{(itemData[item]?.calculatedChange || 0)})
+                                        </span>
+                                    </span>
+                                </p>
+                            ))}
+                        </div>
+
+                        {/* Businesses Column */}
+                        <div style={columnStyles}>
+                            <h3 style={columnTitleStyles}>ธุรกิจ</h3>
+                            {businessItems.map(item => (
+                                <p key={item} style={itemRowStyles}>
+                                    <span style={itemNameStyles}>{item}:</span>
                                     {/* Change number always rendered, but visibility controlled */}
                                     <span style={itemChangeStyles(itemData[item]?.calculatedChange || 0, areChangeNumbersRevealed)}>
-                                        ({(itemData[item]?.calculatedChange || 0) > 0 ? '+' : ''}{(itemData[item]?.calculatedChange || 0)})
+                                        {(itemData[item]?.calculatedChange || 0) > 0 ? '+' : ''}{(itemData[item]?.calculatedChange || 0)}
                                     </span>
-                                </span>
-                            </p>
-                        ))}
+                                </p>
+                            ))}
+                        </div>
+
+                        {/* Stocks Column */}
+                        <div style={columnStyles}>
+                            <h3 style={columnTitleStyles}>หุ้น</h3>
+                            {stockItems.map(item => (
+                                <p key={item} style={itemRowStyles}>
+                                    <span style={itemNameStyles}>{item}:</span>
+                                    <span style={itemValueContainerStyles}>
+                                        {/* No displayed total for stocks */}
+                                        {/* Change text for stocks, visibility controlled using arrow symbols */}
+                                        <span style={itemChangeStyles(itemData[item]?.calculatedChange || 0, areChangeNumbersRevealed, true)}>
+                                            {areChangeNumbersRevealed && itemData[item]?.calculatedChange > 0 ? '▲' :
+                                             areChangeNumbersRevealed && itemData[item]?.calculatedChange < 0 ? '▼' : ''}
+                                        </span>
+                                    </span>
+                                </p>
+                            ))}
+                        </div>
                     </div>
 
-                    {/* Businesses Column */}
-                    <div style={columnStyles}>
-                        <h3 style={columnTitleStyles}>ธุรกิจ</h3>
-                        {businessItems.map(item => (
-                            <p key={item} style={itemRowStyles}>
-                                <span style={itemNameStyles}>{item}:</span>
-                                {/* Change number always rendered, but visibility controlled */}
-                                <span style={itemChangeStyles(itemData[item]?.calculatedChange || 0, areChangeNumbersRevealed)}>
-                                    {(itemData[item]?.calculatedChange || 0) > 0 ? '+' : ''}{(itemData[item]?.calculatedChange || 0)}
-                                </span>
-                            </p>
-                        ))}
-                    </div>
-
-                    {/* Stocks Column */}
-                    <div style={columnStyles}>
-                        <h3 style={columnTitleStyles}>หุ้น</h3>
-                        {stockItems.map(item => (
-                            <p key={item} style={itemRowStyles}>
-                                <span style={itemNameStyles}>{item}:</span>
-                                <span style={itemValueContainerStyles}>
-                                    {/* Displayed total always visible */}
-                                    <span style={itemTotalStyles}>{itemData[item]?.displayedTotal || 0}</span>
-                                    {/* Change number always rendered, but visibility controlled */}
-                                    <span style={itemChangeStyles(itemData[item]?.calculatedChange || 0, areChangeNumbersRevealed)}>
-                                        ({(itemData[item]?.calculatedChange || 0) > 0 ? '+' : ''}{(itemData[item]?.calculatedChange || 0)})
-                                    </span>
-                                </span>
-                            </p>
-                        ))}
-                    </div>
+                    {/* Main Action Button */}
+                    <button
+                        onClick={handleMainButtonClick}
+                        style={{ ...buttonBaseStyles, background: getButtonColor() }}
+                        onMouseEnter={(e) => Object.assign(e.currentTarget.style, { ...buttonBaseStyles, background: getButtonColor() }, buttonHoverStyles)}
+                        onMouseLeave={(e) => Object.assign(e.currentTarget.style, { ...buttonBaseStyles, background: getButtonColor() })}
+                        onMouseDown={(e) => Object.assign(e.currentTarget.style, { ...buttonBaseStyles, background: getButtonColor() }, buttonActiveStyles)}
+                        onMouseUp={(e) => Object.assign(e.currentTarget.style, { ...buttonBaseStyles, background: getButtonColor() })}
+                    >
+                        {getButtonText()}
+                    </button>
                 </div>
-
-                {/* Main Action Button */}
-                <button
-                    onClick={handleMainButtonClick}
-                    style={{ ...buttonBaseStyles, background: getButtonColor() }}
-                    onMouseEnter={(e) => Object.assign(e.currentTarget.style, { ...buttonBaseStyles, background: getButtonColor() }, buttonHoverStyles)}
-                    onMouseLeave={(e) => Object.assign(e.currentTarget.style, { ...buttonBaseStyles, background: getButtonColor() })}
-                    onMouseDown={(e) => Object.assign(e.currentTarget.style, { ...buttonBaseStyles, background: getButtonColor() }, buttonActiveStyles)}
-                    onMouseUp={(e) => Object.assign(e.currentTarget.style, { ...buttonBaseStyles, background: getButtonColor() })}
-                >
-                    {getButtonText()}
-                </button>
-            </div>
+            ) : (
+                // Game Over Summary Screen
+                <div style={summarySectionStyles}>
+                    <h2 style={summaryTitleStyles}>สรุปผลเกม</h2>
+                    <h3 style={summaryItemStyles}>มูลค่าสินทรัพย์สุดท้าย:</h3>
+                    {assetItems.map(item => {
+                        const finalValue = itemData[item]?.displayedTotal || 0;
+                        const initialValue = initialItemValues[item] || 0;
+                        const totalChange = finalValue - initialValue;
+                        return (
+                            <p key={`summary-${item}`} style={summaryItemStyles}>
+                                {item}: <span style={summaryValueStyles(finalValue)}>{finalValue}</span>
+                                <span style={summaryValueStyles(totalChange, true)}> {formatChange(totalChange)}</span>
+                            </p>
+                        );
+                    })}
+                    <h3 style={summaryItemStyles}>ผลรวมการเปลี่ยนแปลงธุรกิจ:</h3>
+                    {businessItems.map(item => (
+                        <p key={`summary-${item}`} style={summaryItemStyles}>
+                            {item}: <span style={summaryValueStyles(itemData[item]?.cumulativeChange || 0, true)}>
+                                {formatChange(itemData[item]?.cumulativeChange || 0)}
+                            </span>
+                        </p>
+                    ))}
+                    <button
+                        onClick={() => window.location.reload()} // Reload to restart the game
+                        style={{
+                            ...buttonBaseStyles,
+                            background: 'linear-gradient(to right, #2196F3, #4CAF50)', // Blue to Green for restart
+                            marginTop: '2rem',
+                        }}
+                        onMouseEnter={(e) => Object.assign(e.currentTarget.style, { ...buttonBaseStyles, background: 'linear-gradient(to right, #2196F3, #4CAF50)' }, buttonHoverStyles)}
+                        onMouseLeave={(e) => Object.assign(e.currentTarget.style, { ...buttonBaseStyles, background: 'linear-gradient(to right, #2196F3, #4CAF50)' })}
+                        onMouseDown={(e) => Object.assign(e.currentTarget.style, { ...buttonBaseStyles, background: 'linear-gradient(to right, #2196F3, #4CAF50)' }, buttonActiveStyles)}
+                        onMouseUp={(e) => Object.assign(e.currentTarget.style, { ...buttonBaseStyles, background: 'linear-gradient(to right, #2196F3, #4CAF50)' })}
+                    >
+                        เล่นใหม่
+                    </button>
+                </div>
+            )}
         </div>
     );
 };
