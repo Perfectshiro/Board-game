@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 // Helper function to get a random integer within a range
 const getRandomInt = (min, max) => {
@@ -57,9 +57,9 @@ const App = () => {
   const [usedScenarioIndices, setUsedScenarioIndices] = useState([]);
 
   const [assets, setAssets] = useState({
-    'ทองคำ': { value: 15, change: 0, totalValue: 15 },
-    'ที่ดิน': { value: 15, change: 0, totalValue: 15 },
-    'คริปโต': { value: 5, change: 0, totalValue: 5 },
+    'ทองคำ': { value: 3, change: 0, totalValue: 3 },
+    'ที่ดิน': { value: 3, change: 0, totalValue: 3 },
+    'คริปโต': { value: 3, change: 0, totalValue: 3 },
   });
   const [businesses, setBusinesses] = useState({
     'ร้านอาหาร': { value: 3, change: 0 },
@@ -75,6 +75,19 @@ const App = () => {
     stockF: { value: 0, change: 0 },
     stockG: { value: 0, change: 0 },
   });
+  
+  // Add useEffect to control body scrolling
+  useEffect(() => {
+    if (showWelcomePopup) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'auto';
+    }
+    // Clean up the style on component unmount
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, [showWelcomePopup]);
 
   const allScenarios = [
      {
@@ -883,7 +896,6 @@ const App = () => {
       sentiment: 1,
     },
   ];
-
   const handleNextAction = () => {
     if (stage === 'initial' || (stage === 'result' && year < 15)) {
       setIsLoading(true);
@@ -981,9 +993,9 @@ const App = () => {
     setNegativeScenarioCount(0); // Reset negative scenario count
     setUsedScenarioIndices([]); // Reset used scenario indices
     setAssets({
-      'ทองคำ': { value: 15, change: 0, totalValue: 15 },
-      'ที่ดิน': { value: 15, change: 0, totalValue: 15 },
-      'คริปโต': { value: 5, change: 0, totalValue: 5 },
+      'ทองคำ': { value: 3, change: 0, totalValue: 3 },
+      'ที่ดิน': { value: 3, change: 0, totalValue: 3 },
+      'คริปโต': { value: 3, change: 0, totalValue: 3 },
     });
     setBusinesses({
       'ร้านอาหาร': { value: 3, change: 0 },
@@ -1082,7 +1094,7 @@ const App = () => {
       const effect = scenario?.results?.effects.find(e => e.assetName === assetName);
       return effect ? effect.description : '';
   };
-
+  
   const WelcomePopup = ({ onClose }) => {
     const popupContent = [
       {
@@ -1106,7 +1118,6 @@ const App = () => {
         text: 'เมื่อรู้จักสินทรัพย์แล้ว ก็ต้องวางแผนให้ดีเหมือนการวางกลยุทธ์ก่อนเล่นเกม จะได้ไม่พลาด อย่าเอาเงินทั้งหมดไปลงทุนในสิ่งเดียว เพราะถ้าสิ่งนั้นราคาตก เราจะขาดทุนเยอะมาก ลองแบ่งเงินไปลงทุนในหลายๆ อย่าง เช่น เงินฝาก: ปลอดภัยที่สุด เอาไว้ใช้ยามฉุกเฉิน ทองคำ: เก็บไว้เป็นของมีค่า ราคามักจะขึ้นเวลาเศรษฐกิจไม่ดี ที่ดิน: ซื้อไว้เพื่อหวังว่าราคาจะเพิ่มในอนาคต'
       }
     ];
-    // END: จุดที่สามารถแก้ไขข้อความในป๊อปอัพได้
 
     const currentPageContent = popupContent[welcomePage - 1];
 
@@ -1114,7 +1125,9 @@ const App = () => {
         <div className="welcome-popup-overlay">
             <div className="welcome-popup-card">
                 <h2 className="popup-title">{currentPageContent.title}</h2>
-                <p className="popup-text">{currentPageContent.text}</p>
+                <div className="popup-scrollable-content">
+                    <p className="popup-text">{currentPageContent.text}</p>
+                </div>
                 {welcomePage < popupContent.length ? (
                     <button
                         onClick={() => setWelcomePage(prevPage => prevPage + 1)}
@@ -1174,13 +1187,21 @@ const App = () => {
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
             max-width: 56rem;
             width: 100%;
-            height: auto;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
+            
+            max-height: 90vh; /* Allow the card to be a maximum height */
+            overflow: hidden; /* Hide the overflow on the card itself */
         }
         
+        .popup-scrollable-content {
+            flex-grow: 1; /* Allow content to fill available space */
+            overflow-y: auto; /* Enable vertical scrolling for the content */
+            padding-right: 1rem; /* Add some padding to prevent text from touching the scrollbar */
+        }
+
         .popup-title {
             font-size: 2.5rem;
             font-weight: 700;
