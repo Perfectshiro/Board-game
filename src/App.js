@@ -1012,7 +1012,14 @@ const App = () => {
       stockG: { value: 0, change: 0 },
     });
   };
+  
+  const handleGoHome = () => {
+    handleRestart(); // รีเซ็ตค่าเกม
+    setShowWelcomePopup(true); // แสดงหน้าต้อนรับใหม่
+    setWelcomePage(1); // เริ่มหน้าต้อนรับที่หน้าแรก
+  };
 
+  
   const getButtonText = () => {
     if (stage === 'initial') {
         return 'เริ่มเกม';
@@ -1088,6 +1095,12 @@ const App = () => {
       </div>
     );
   };
+  const [showHowToPlay, setShowHowToPlay] = useState(false);
+  useEffect(() => {
+    document.body.style.overflow = (showWelcomePopup || showHowToPlay) ? 'hidden' : 'auto';
+    return () => { document.body.style.overflow = 'auto'; };
+  }, [showWelcomePopup, showHowToPlay]);
+
 
   // Function to get description for a specific asset/business/stock
   const getEffectDescription = (assetName) => {
@@ -1502,17 +1515,103 @@ const App = () => {
         .panel.assets-panel {
             min-height: 350px;
         }
+            
+        .home-button-fixed {position: fixed; 
+        bottom: 1.5rem; 
+        left: 1.5rem; 
+        width: auto; 
+        min-width: 140px; 
+        background: rgba(0, 0, 0, 0.4); 
+        backdrop-filter: blur(8px); 
+        color: white; 
+        padding: 0.8rem 1.5rem; 
+        border-radius: 0.75rem; 
+        border: 1px solid rgba(255, 255, 255, 0.2); 
+        font-size: 1rem; 
+        cursor: pointer; 
+        transition: all 0.3s; 
+        z-index: 100; }
+
+        .home-button-fixed:hover {
+        background: rgba(255, 255, 255, 0.1);
+        transform: translateY(-2px);}
+        .how-to-button-fixed {
+          position: fixed;
+          bottom: 5.5rem; /* ขยับขึ้นมาจากปุ่ม Home */
+          left: 1.5rem;
+          width: auto;
+          min-width: 140px;
+          background: rgba(0, 0, 0, 0.4);
+          backdrop-filter: blur(8px);
+          color: #fde047; /* สีเหลืองให้เด่น */
+          padding: 0.8rem 1.5rem;
+          border-radius: 0.75rem;
+          border: 1px solid rgba(252, 224, 71, 0.3);
+          font-size: 1rem;
+          cursor: pointer;
+          transition: all 0.3s;
+          z-index: 50;
+        }
+        .how-to-button-fixed:hover, .home-button-fixed:hover {
+          background: rgba(255, 255, 255, 0.1);
+          transform: translateY(-2px);
+        }
+          /* เลเยอร์พื้นหลังสีดำโปร่งแสง */
+        .image-modal-overlay {
+        position: fixed;     /* ให้อยู่กับที่ ไม่เลื่อนตามการ scroll */
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: rgba(0, 0, 0, 0.7); /* สีดำจางๆ */
+        display: flex;
+        justify-content: center; /* จัดกลางแนวนอน */
+        align-items: center;     /* จัดกลางแนวตั้ง */
+        z-index: 9999;          /* ตัวเลขสูงๆ เพื่อให้ทับทุกอย่าง (Foreground/Buttons) */
+        }
+
+        /* กล่องเนื้อหาข้างใน */
+        .image-modal-content {
+        position: relative;
+        max-width: 90%;         /* ไม่ให้กว้างเกินหน้าจอมือถือ */
+        max-height: 90%;        /* ไม่ให้สูงเกินหน้าจอมือถือ */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        }
+
+        /* รูปภาพวิธีการเล่น */
+        .how-to-image {
+        width: auto;
+        height: auto;
+        max-width: 100%;
+        max-height: 80vh;       /* จำกัดความสูงไม่ให้เลยหน้าจอ */
+        border-radius: 15px;    /* เพิ่มความสวยงาม */
+        box-shadow: 0 5px 15px rgba(0,0,0,0.5); /* เพิ่มมิติให้เด้งออกมา */
+        }
+  
         `}
+
       </style>
+      {showWelcomePopup && <WelcomePopup onClose={() => setShowWelcomePopup(false)} />}
+        <button onClick={handleGoHome} className="home-button-fixed">
+      🏠 กลับหน้าหลัก
+      </button>
+      
+      
       <img src="https://i.postimg.cc/RFrD5Y2h/Artboard-2.png" alt="Foreground" className="foreground-layer" />
       
-      {showWelcomePopup && <WelcomePopup onClose={() => setShowWelcomePopup(false)} />}
       
+      {showWelcomePopup && <WelcomePopup onClose={() => setShowWelcomePopup(false)} />}
+        
+      
+
       <div className="main-card">
         <h1 className="main-title">ปีการลงทุนที่: {year}</h1>
         <div className="panels-grid">
             {stage !== 'end' ? (
                 <>
+                
                 <div className="scenario-box full-width-panel">
                     <h2 className="scenario-title">สถานการณ์:</h2>
                     <div className={`scenario-text ${isLoading ? 'blinking' : ''}`}>
@@ -1619,9 +1718,27 @@ const App = () => {
           disabled={isLoading}
         >
           {getButtonText()}
-        </button>
+        </button> 
+        
+       
+        
+         
+
       </div>
+      {showHowToPlay && (
+        <div className="image-modal-overlay" onClick={() => setShowHowToPlay(false)}>
+          <div className="image-modal-content" onClick={e => e.stopPropagation()}>
+            <img src="https://i.postimg.cc/yx4xk3Tt/Gemini-Generated-Image-6jagv36jagv36jag.png" className="how-to-image" />
+            </div>
+            </div>
+          )}
+
+          <button onClick={() => setShowHowToPlay(!showHowToPlay)} className="how-to-button-fixed">
+            📖 วิธีการเล่น
+            </button>
+      
     </div>
+    
   );
 };
 
