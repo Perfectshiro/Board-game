@@ -1573,8 +1573,9 @@ const App = () => {
         /* กล่องเนื้อหาข้างใน */
         .image-modal-content {
         position: relative;
-        max-width: 90%;         /* ไม่ให้กว้างเกินหน้าจอมือถือ */
-        max-height: 90%;        /* ไม่ให้สูงเกินหน้าจอมือถือ */
+        width: calc(100vw - 40px);
+        height: auto;
+        max-height: calc(100vh - 40px);
         display: flex;
         justify-content: center;
         align-items: center;
@@ -1582,13 +1583,52 @@ const App = () => {
 
         /* รูปภาพวิธีการเล่น */
         .how-to-image {
-        width: auto;
+        width: 100%;
         height: auto;
-        max-width: 100%;
-        max-height: 80vh;       /* จำกัดความสูงไม่ให้เลยหน้าจอ */
+        
+        max-height: calc(100vh - 40px);       /* จำกัดความสูงไม่ให้เลยหน้าจอ */
+        object-fit: contain;
         border-radius: 15px;    /* เพิ่มความสวยงาม */
         box-shadow: 0 5px 15px rgba(0,0,0,0.5); /* เพิ่มมิติให้เด้งออกมา */
         }
+
+        .link-button-fixed {
+        position: fixed;
+        bottom: 1.5rem; /* ระดับเดียวกับปุ่ม Home */
+        right: 1.5rem;  /* อยู่ฝั่งขวา */
+        width: auto;
+        min-width: 140px;
+        background: rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(8px);
+        color: #ffffff; /* เปลี่ยนเป็นสีเขียวให้ดูต่างจากปุ่มอื่น หรือใช้สีตามใจชอบครับ */
+        padding: 0.8rem 1.5rem;
+        border-radius: 0.75rem;
+        border: 1px solid rgba(87, 255, 138, 0.3);
+        font-size: 1rem;
+        text-align: center;
+        text-decoration: none; /* ลบเส้นใต้ลิงก์ */
+        cursor: pointer;
+        transition: all 0.3s;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        }
+
+        .link-button-fixed:hover {
+        background: rgba(255, 255, 255, 0.1);
+        transform: translateY(-2px);
+        color: #ffffff;
+        }
+
+        .home-button-fixed, 
+        .how-to-button-fixed, 
+        .link-button-fixed,
+        .action-button,
+        .popup-button {
+            font-family: 'Prompt', sans-serif !important;
+            font-weight: 400; /* หรือ 600 ถ้าต้องการให้ตัวหนาขึ้น */
+          }
   
         `}
 
@@ -1727,8 +1767,11 @@ const App = () => {
       </div>
       {showHowToPlay && (
         <div className="image-modal-overlay" onClick={() => setShowHowToPlay(false)}>
-          <div className="image-modal-content" onClick={e => e.stopPropagation()}>
-            <img src="https://i.postimg.cc/yx4xk3Tt/Gemini-Generated-Image-6jagv36jagv36jag.png"  />
+          <div className="image-modal-content" onClick={e => setShowHowToPlay(false)}>
+            <img 
+            src="https://img2.pic.in.th/7d498bd1855f0119a283ca2ac5b1e72f.png"  
+            className="how-to-image"
+            />
             </div>
             </div>
           )}
@@ -1736,6 +1779,16 @@ const App = () => {
           <button onClick={() => setShowHowToPlay(!showHowToPlay)} className="how-to-button-fixed">
             📖 วิธีการเล่น
             </button>
+
+            {/* เพิ่มปุ่มใหม่ (ฝั่งขวา) ตรงนี้ */}
+            <a 
+              href="https://nextgen-investors.vercel.app/"  /* ใส่ URL ของคุณที่นี่ */
+         
+              rel="noopener noreferrer"     /* เพื่อความปลอดภัย */
+              className="link-button-fixed"
+            >
+              ไปยังหน้าแรก
+            </a>
       
     </div>
     
